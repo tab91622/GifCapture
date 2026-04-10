@@ -1,0 +1,27 @@
+[package]
+name = "recordTogif"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+gif = "0.13"
+iced = { version = "0.12", features = ["tokio"] }
+image = "0.25"
+rfd = "0.15"
+tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
+
+[package.metadata.bundle]
+name = "RecordToGif"
+identifier = "com.wangchi.recordtogif"
+icon = ["assets/icon.icns"]
+short_description = "macOS 录屏转 GIF 工具"
+long_description = "使用 Rust + iced 开发的 macOS 录屏转 GIF 桌面工具。"
+category = "DeveloperTool"
+anyhow = "1.0.102"
+chrono = "0.4.44"
+dirs = "6.0.0"
+gif = "0.14.2"
+iced = "0.14.0"
+image = "0.25.10"
+screenshots = "0.8.10"
+thiserror = "2.0.18"

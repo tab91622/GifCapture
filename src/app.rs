@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use iced::alignment::Horizontal;
 use iced::event;
 use iced::executor;
 use iced::theme;
@@ -37,8 +36,6 @@ pub struct RecordToGifApp {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    RegionXChanged(String),
-    RegionYChanged(String),
     RegionWidthChanged(String),
     RegionHeightChanged(String),
     FpsChanged(String),
@@ -102,8 +99,6 @@ impl Application for RecordToGifApp {
 
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
-            Message::RegionXChanged(value) => self.region_x = value,
-            Message::RegionYChanged(value) => self.region_y = value,
             Message::RegionWidthChanged(value) => self.region_width = value,
             Message::RegionHeightChanged(value) => self.region_height = value,
             Message::FpsChanged(value) => self.fps = value,
@@ -261,18 +256,6 @@ impl Application for RecordToGifApp {
 
     fn view(&self) -> Element<'_, Message> {
         let controls_row = row![
-            text_input("x", &self.region_x)
-                .on_input(Message::RegionXChanged)
-                .padding([5, 8])
-                .size(13)
-                .style(theme::TextInput::Custom(Box::new(GlassInputStyle)))
-                .width(Length::Fixed(52.0)),
-            text_input("y", &self.region_y)
-                .on_input(Message::RegionYChanged)
-                .padding([5, 8])
-                .size(13)
-                .style(theme::TextInput::Custom(Box::new(GlassInputStyle)))
-                .width(Length::Fixed(52.0)),
             text_input("w", &self.region_width)
                 .on_input(Message::RegionWidthChanged)
                 .padding([5, 8])
@@ -300,29 +283,33 @@ impl Application for RecordToGifApp {
         ]
         .spacing(6);
 
-        let start_button = button("Rec")
-            .padding([5, 10])
+        let start_button = button("Record")
+            .padding([6, 14])
+            .width(Length::Fixed(76.0))
             .style(theme::Button::custom(MinimalButtonStyle::primary()))
             .on_press_maybe(
                 (!self.is_recording && !self.is_exporting).then_some(Message::StartRecording),
             );
 
         let stop_button = button("Stop")
-            .padding([5, 10])
+            .padding([6, 14])
+            .width(Length::Fixed(64.0))
             .style(theme::Button::custom(MinimalButtonStyle::danger()))
             .on_press_maybe(
                 (self.is_recording && !self.is_exporting).then_some(Message::StopRecording),
             );
 
-        let export_button = button("Exp")
-            .padding([5, 10])
+        let export_button = button("Export")
+            .padding([6, 14])
+            .width(Length::Fixed(72.0))
             .style(theme::Button::custom(MinimalButtonStyle::primary()))
             .on_press_maybe(
                 (!self.is_recording && !self.is_exporting).then_some(Message::ExportGif),
             );
 
-        let clear_button = button("Clr")
-            .padding([5, 10])
+        let clear_button = button("Clear")
+            .padding([6, 14])
+            .width(Length::Fixed(64.0))
             .style(theme::Button::custom(MinimalButtonStyle::neutral()))
             .on_press_maybe(
                 (!self.is_recording && !self.is_exporting).then_some(Message::ClearFrames),
@@ -341,24 +328,10 @@ impl Application for RecordToGifApp {
         .height(Length::Fixed(Self::CONTROLS_STRIP_HEIGHT as f32))
         .center_y();
 
-        let status_bar = container(
-            text(&self.status)
-                .width(Length::Fill)
-                .size(11)
-                .horizontal_alignment(Horizontal::Left),
-        )
-        .height(Length::Fixed(Self::STATUS_BAR_HEIGHT as f32))
-        .padding([2, 8])
-        .style(theme::Container::Custom(Box::new(StatusBarStyle)))
-        .center_y();
-        let panel_content = column![
-            controls_strip,
-            container(text("")).height(Length::Fixed(Self::STATUS_GAP_HEIGHT as f32)),
-            status_bar
-        ]
-        .spacing(0)
-        .padding(Self::TOP_PANEL_INNER_PADDING as u16)
-        .width(Length::Fill);
+        let panel_content = column![controls_strip]
+            .spacing(0)
+            .padding(Self::TOP_PANEL_INNER_PADDING as u16)
+            .width(Length::Fill);
 
         let top_panel = container(panel_content)
             .width(Length::Fill)
@@ -372,7 +345,11 @@ impl Application for RecordToGifApp {
                 show_border: !self.is_recording,
             })));
 
-        let layout = column![top_panel, capture_hole]
+        let layout = column![
+            top_panel,
+            container(text("")).height(Length::Fixed(Self::CAPTURE_START_Y_COMPENSATION as f32)),
+            capture_hole
+        ]
             .spacing(0)
             .width(Length::Fill)
             .height(Length::Fill);
@@ -433,9 +410,9 @@ impl RecordToGifApp {
     const WINDOW_BORDER_WIDTH: i32 = 2;
     const TOP_PANEL_INNER_PADDING: i32 = 10;
     const CONTROLS_STRIP_HEIGHT: i32 = 50;
-    const STATUS_GAP_HEIGHT: i32 = 4;
-    const STATUS_BAR_HEIGHT: i32 = 30;
-    const CAPTURE_START_Y_COMPENSATION: i32 = 2;
+    const STATUS_GAP_HEIGHT: i32 = 0;
+    const STATUS_BAR_HEIGHT: i32 = 0;
+    const CAPTURE_START_Y_COMPENSATION: i32 = 6;
     const TOP_PANEL_HEIGHT: i32 = Self::TOP_PANEL_INNER_PADDING * 2
         + Self::CONTROLS_STRIP_HEIGHT
         + Self::STATUS_GAP_HEIGHT
@@ -641,7 +618,7 @@ impl MinimalButtonStyle {
             text_color,
             border: Border {
                 radius: 11.0.into(),
-                width: 1.2,
+                width: 1.0,
                 color: border,
             },
             shadow: iced::Shadow::default(),
@@ -661,24 +638,15 @@ impl button::StyleSheet for MinimalButtonStyle {
         let mut active = self.active(style);
         if let Some(Background::Color(color)) = active.background {
             active.background = Some(Background::Color(Color {
-                a: (color.a + 0.14).min(1.0),
+                a: (color.a + 0.06).min(1.0),
                 ..color
             }));
         }
-        active.border.width = 1.5;
         active
     }
 
     fn pressed(&self, style: &Self::Style) -> button::Appearance {
-        let mut active = self.active(style);
-        active.border.width = 1.0;
-        if let Some(Background::Color(color)) = active.background {
-            active.background = Some(Background::Color(Color {
-                a: (color.a * 0.90).max(0.20),
-                ..color
-            }));
-        }
-        active
+        self.active(style)
     }
 
     fn disabled(&self, style: &Self::Style) -> button::Appearance {
@@ -705,34 +673,34 @@ impl iced::widget::text_input::StyleSheet for GlassInputStyle {
 
     fn active(&self, _style: &Self::Style) -> iced::widget::text_input::Appearance {
         iced::widget::text_input::Appearance {
-            background: Background::Color(Color::from_rgba(0.08, 0.10, 0.14, 0.76)),
+            background: Background::Color(Color::from_rgba(0.93, 0.96, 1.0, 0.78)),
             border: Border {
                 radius: 11.0.into(),
                 width: 1.2,
-                color: Color::from_rgba(0.70, 0.80, 0.96, 0.84),
+                color: Color::from_rgba(0.56, 0.69, 0.90, 0.82),
             },
-            icon_color: Color::from_rgb8(220, 228, 240),
+            icon_color: Color::from_rgb8(70, 100, 145),
         }
     }
 
     fn focused(&self, _style: &Self::Style) -> iced::widget::text_input::Appearance {
         iced::widget::text_input::Appearance {
-            background: Background::Color(Color::from_rgba(0.06, 0.08, 0.12, 0.86)),
+            background: Background::Color(Color::from_rgba(0.98, 0.99, 1.0, 0.92)),
             border: Border {
                 radius: 11.0.into(),
                 width: 1.6,
-                color: Color::from_rgba(0.64, 0.82, 1.0, 0.98),
+                color: Color::from_rgba(0.45, 0.64, 0.92, 0.98),
             },
-            icon_color: Color::from_rgb8(240, 246, 255),
+            icon_color: Color::from_rgb8(44, 78, 130),
         }
     }
 
     fn placeholder_color(&self, _style: &Self::Style) -> Color {
-        Color::from_rgba(0.92, 0.95, 1.0, 0.92)
+        Color::from_rgba(0.28, 0.38, 0.56, 0.70)
     }
 
     fn value_color(&self, _style: &Self::Style) -> Color {
-        Color::from_rgb8(247, 250, 255)
+        Color::from_rgb8(26, 40, 64)
     }
 
     fn disabled_color(&self, _style: &Self::Style) -> Color {
@@ -745,29 +713,9 @@ impl iced::widget::text_input::StyleSheet for GlassInputStyle {
 
     fn disabled(&self, style: &Self::Style) -> iced::widget::text_input::Appearance {
         let mut base = self.active(style);
-        base.background = Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.10));
-        base.border.color = Color::from_rgba(0.88, 0.90, 0.96, 0.22);
+        base.background = Background::Color(Color::from_rgba(0.92, 0.94, 0.98, 0.44));
+        base.border.color = Color::from_rgba(0.66, 0.74, 0.88, 0.35);
         base
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct StatusBarStyle;
-
-impl iced::widget::container::StyleSheet for StatusBarStyle {
-    type Style = Theme;
-
-    fn appearance(&self, _style: &Self::Style) -> iced::widget::container::Appearance {
-        iced::widget::container::Appearance {
-            text_color: None,
-            background: Some(Background::Color(Color::from_rgba(0.07, 0.09, 0.13, 0.72))),
-            border: Border {
-                radius: 10.0.into(),
-                width: 0.8,
-                color: Color::from_rgba(0.72, 0.82, 0.96, 0.54),
-            },
-            shadow: iced::Shadow::default(),
-        }
     }
 }
 

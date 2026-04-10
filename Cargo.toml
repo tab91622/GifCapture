@@ -1,5 +1,5 @@
 [package]
-name = "recordTogif"
+name = "gifcapture"
 version = "0.1.0"
 edition = "2024"
 
@@ -11,8 +11,8 @@ rfd = "0.15"
 tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
 
 [package.metadata.bundle]
-name = "RecordToGif"
-identifier = "com.wangchi.recordtogif"
+name = "GifCapture"
+identifier = "com.wangchi.gifcapture"
 icon = ["assets/icon.icns"]
 short_description = "macOS 录屏转 GIF 工具"
 long_description = "使用 Rust + iced 开发的 macOS 录屏转 GIF 桌面工具。"

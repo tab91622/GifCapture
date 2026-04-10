@@ -3,11 +3,11 @@ mod capture;
 mod encoder;
 mod types;
 
-use app::RecordToGifApp;
+use app::GifCaptureApp;
 use iced::Application;
 
 fn main() -> iced::Result {
-    RecordToGifApp::run(app_settings())
+    GifCaptureApp::run(app_settings())
 }
 
 fn app_settings() -> iced::Settings<()> {

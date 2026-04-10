@@ -1,6 +1,6 @@
-# recordTogif
+# GifCapture
 
-`recordTogif` 是一个使用 Rust 开发的 macOS 桌面工具，提供区域录制并导出 GIF。
+`GifCapture` 是一个使用 Rust 开发的 macOS 桌面工具，提供区域录制并导出 GIF。
 
 当前版本为 MVP，技术栈：
 

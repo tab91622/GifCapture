@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_NAME="RecordToGif.app"
+APP_NAME="GifCapture.app"
 APP_BUNDLE_DIR="target/release/bundle/osx"
 APP_PATH="${APP_BUNDLE_DIR}/${APP_NAME}"
 DIST_DIR="dist"
-DMG_NAME="RecordToGif.dmg"
+DMG_NAME="GifCapture.dmg"
 DMG_PATH="${DIST_DIR}/${DMG_NAME}"
 
 echo "[1/3] 构建 release 并生成 .app..."
@@ -22,7 +22,7 @@ rm -f "${DMG_PATH}"
 echo "[2/3] 生成 .dmg..."
 if command -v create-dmg >/dev/null 2>&1; then
   create-dmg \
-    --volname "RecordToGif Installer" \
+    --volname "GifCapture Installer" \
     --window-size 800 500 \
     --icon-size 128 \
     --app-drop-link 620 250 \
@@ -33,7 +33,7 @@ else
   TMP_DIR="$(mktemp -d)"
   cp -R "${APP_PATH}" "${TMP_DIR}/"
   ln -s /Applications "${TMP_DIR}/Applications"
-  hdiutil create -volname "RecordToGif Installer" -srcfolder "${TMP_DIR}" -ov -format UDZO "${DMG_PATH}"
+  hdiutil create -volname "GifCapture Installer" -srcfolder "${TMP_DIR}" -ov -format UDZO "${DMG_PATH}"
   rm -rf "${TMP_DIR}"
 fi
 

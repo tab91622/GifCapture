@@ -14,7 +14,7 @@ use crate::encoder;
 use crate::types::{CaptureRegion, CapturedFrame};
 
 #[derive(Default)]
-pub struct RecordToGifApp {
+pub struct GifCaptureApp {
     region_x: String,
     region_y: String,
     region_width: String,
@@ -63,7 +63,7 @@ pub enum Message {
     ExportFinished(Result<encoder::EncodeSuccess, encoder::EncodeFailure>),
 }
 
-impl Application for RecordToGifApp {
+impl Application for GifCaptureApp {
     type Executor = executor::Default;
     type Message = Message;
     type Theme = Theme;
@@ -90,7 +90,7 @@ impl Application for RecordToGifApp {
     }
 
     fn title(&self) -> String {
-        "RecordToGif".to_string()
+        "GifCapture".to_string()
     }
 
     fn style(&self) -> theme::Application {
@@ -350,9 +350,9 @@ impl Application for RecordToGifApp {
             container(text("")).height(Length::Fixed(Self::CAPTURE_START_Y_COMPENSATION as f32)),
             capture_hole
         ]
-            .spacing(0)
-            .width(Length::Fill)
-            .height(Length::Fill);
+        .spacing(0)
+        .width(Length::Fill)
+        .height(Length::Fill);
 
         container(layout)
             .width(Length::Fill)
@@ -404,7 +404,7 @@ impl Application for RecordToGifApp {
     }
 }
 
-impl RecordToGifApp {
+impl GifCaptureApp {
     // Geometry constants for "top controls + transparent capture hole".
     const WINDOW_INNER_PADDING: i32 = 8;
     const WINDOW_BORDER_WIDTH: i32 = 2;

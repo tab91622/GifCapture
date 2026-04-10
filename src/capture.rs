@@ -65,5 +65,5 @@ fn temp_capture_file() -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    std::env::temp_dir().join(format!("recordtogif-{nanos}.png"))
+    std::env::temp_dir().join(format!("gifcapture-{nanos}.png"))
 }

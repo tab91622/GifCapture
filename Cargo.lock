@@ -1364,6 +1364,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "gifcapture"
+version = "0.1.0"
+dependencies = [
+ "gif 0.13.3",
+ "iced",
+ "image",
+ "rfd",
+ "tokio",
+]
+
+[[package]]
 name = "gl_generator"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3128,17 +3139,6 @@ checksum = "69aacb76b5c29acfb7f90155d39759a29496aebb49395830e928a9703d2eec2f"
 dependencies = [
  "bytemuck",
  "font-types",
-]
-
-[[package]]
-name = "recordTogif"
-version = "0.1.0"
-dependencies = [
- "gif 0.13.3",
- "iced",
- "image",
- "rfd",
- "tokio",
 ]
 
 [[package]]

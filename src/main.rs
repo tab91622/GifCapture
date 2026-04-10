@@ -23,8 +23,8 @@ fn app_settings() -> iced::Settings<()> {
 
     iced::Settings {
         window: iced::window::Settings {
-            size: iced::Size::new(588.0, 360.0),
-            min_size: Some(iced::Size::new(588.0, 360.0)),
+            size: iced::Size::new(588.0, 436.0),
+            min_size: Some(iced::Size::new(588.0, 436.0)),
             transparent: true,
             platform_specific,
             ..iced::window::Settings::default()

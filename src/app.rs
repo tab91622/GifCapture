@@ -338,7 +338,7 @@ impl Application for RecordToGifApp {
             ]
             .spacing(6),
         )
-        .height(Length::Fixed(50.0))
+        .height(Length::Fixed(Self::CONTROLS_STRIP_HEIGHT as f32))
         .center_y();
 
         let status_bar = container(
@@ -347,27 +347,40 @@ impl Application for RecordToGifApp {
                 .size(11)
                 .horizontal_alignment(Horizontal::Left),
         )
-        .height(Length::Fixed(30.0))
+        .height(Length::Fixed(Self::STATUS_BAR_HEIGHT as f32))
         .padding([2, 8])
         .style(theme::Container::Custom(Box::new(StatusBarStyle)))
         .center_y();
         let panel_content = column![
             controls_strip,
-            container(text("")).height(Length::Fixed(4.0)),
+            container(text("")).height(Length::Fixed(Self::STATUS_GAP_HEIGHT as f32)),
             status_bar
         ]
         .spacing(0)
-        .padding(10)
+        .padding(Self::TOP_PANEL_INNER_PADDING as u16)
         .width(Length::Fill);
 
-        let panel = container(panel_content)
+        let top_panel = container(panel_content)
             .width(Length::Fill)
+            .height(Length::Fixed(Self::TOP_PANEL_HEIGHT as f32))
             .style(theme::Container::Custom(Box::new(FloatingPanelStyle)));
 
-        container(panel)
+        let capture_hole = container(text(""))
             .width(Length::Fill)
             .height(Length::Fill)
-            .padding(8)
+            .style(theme::Container::Custom(Box::new(CaptureHoleStyle {
+                show_border: !self.is_recording,
+            })));
+
+        let layout = column![top_panel, capture_hole]
+            .spacing(0)
+            .width(Length::Fill)
+            .height(Length::Fill);
+
+        container(layout)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .padding(Self::WINDOW_INNER_PADDING as u16)
             .style(theme::Container::Custom(Box::new(RecordingFrameStyle)))
             .into()
     }
@@ -415,11 +428,18 @@ impl Application for RecordToGifApp {
 }
 
 impl RecordToGifApp {
-    // Full-size content view is enabled, so content area maps 1:1 to window geometry.
-    const CONTENT_OFFSET_X: i32 = 0;
-    const CONTENT_OFFSET_Y: i32 = 0;
-    const CONTENT_WIDTH_DELTA: i32 = 0;
-    const CONTENT_HEIGHT_DELTA: i32 = 0;
+    // Geometry constants for "top controls + transparent capture hole".
+    const WINDOW_INNER_PADDING: i32 = 8;
+    const WINDOW_BORDER_WIDTH: i32 = 2;
+    const TOP_PANEL_INNER_PADDING: i32 = 10;
+    const CONTROLS_STRIP_HEIGHT: i32 = 50;
+    const STATUS_GAP_HEIGHT: i32 = 4;
+    const STATUS_BAR_HEIGHT: i32 = 30;
+    const CAPTURE_START_Y_COMPENSATION: i32 = 2;
+    const TOP_PANEL_HEIGHT: i32 = Self::TOP_PANEL_INNER_PADDING * 2
+        + Self::CONTROLS_STRIP_HEIGHT
+        + Self::STATUS_GAP_HEIGHT
+        + Self::STATUS_BAR_HEIGHT;
 
     fn sync_region_from_window_geometry(&mut self) {
         let region = Self::content_region_from_window(
@@ -440,10 +460,21 @@ impl RecordToGifApp {
         window_width: u32,
         window_height: u32,
     ) -> CaptureRegion {
-        let x = (window_x + Self::CONTENT_OFFSET_X).max(0) as u32;
-        let y = (window_y + Self::CONTENT_OFFSET_Y).max(0) as u32;
-        let width = (window_width as i32 + Self::CONTENT_WIDTH_DELTA).max(1) as u32;
-        let height = (window_height as i32 + Self::CONTENT_HEIGHT_DELTA).max(1) as u32;
+        let x = (window_x + Self::WINDOW_INNER_PADDING + Self::WINDOW_BORDER_WIDTH).max(0) as u32;
+        let y = (window_y
+            + Self::WINDOW_INNER_PADDING
+            + Self::WINDOW_BORDER_WIDTH
+            + Self::TOP_PANEL_HEIGHT
+            + Self::CAPTURE_START_Y_COMPENSATION)
+            .max(0) as u32;
+        let width = (window_width as i32
+            - 2 * (Self::WINDOW_INNER_PADDING + Self::WINDOW_BORDER_WIDTH))
+            .max(1) as u32;
+        let height = (window_height as i32
+            - 2 * (Self::WINDOW_INNER_PADDING + Self::WINDOW_BORDER_WIDTH)
+            - Self::TOP_PANEL_HEIGHT
+            - Self::CAPTURE_START_Y_COMPENSATION)
+            .max(1) as u32;
 
         CaptureRegion {
             x,
@@ -509,7 +540,7 @@ impl iced::application::StyleSheet for TransparentWindowStyle {
 
     fn appearance(&self, _style: &Self::Style) -> iced::application::Appearance {
         iced::application::Appearance {
-            background_color: Color::from_rgba(0.0, 0.0, 0.0, 0.04),
+            background_color: Color::from_rgba(0.0, 0.0, 0.0, 0.0),
             text_color: Color::from_rgb8(245, 245, 248),
         }
     }
@@ -524,17 +555,13 @@ impl iced::widget::container::StyleSheet for FloatingPanelStyle {
     fn appearance(&self, _style: &Self::Style) -> iced::widget::container::Appearance {
         iced::widget::container::Appearance {
             text_color: None,
-            background: Some(Background::Color(Color::from_rgba(0.11, 0.12, 0.14, 0.70))),
+            background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.0))),
             border: Border {
-                radius: 14.0.into(),
-                width: 1.0,
-                color: Color::from_rgba(1.0, 1.0, 1.0, 0.20),
+                radius: 0.0.into(),
+                width: 0.0,
+                color: Color::TRANSPARENT,
             },
-            shadow: iced::Shadow {
-                color: Color::from_rgba(0.0, 0.0, 0.0, 0.20),
-                offset: iced::Vector::new(0.0, 4.0),
-                blur_radius: 8.0,
-            },
+            shadow: iced::Shadow::default(),
         }
     }
 }
@@ -548,7 +575,7 @@ impl iced::widget::container::StyleSheet for RecordingFrameStyle {
     fn appearance(&self, _style: &Self::Style) -> iced::widget::container::Appearance {
         iced::widget::container::Appearance {
             text_color: None,
-            background: Some(Background::Color(Color::from_rgba(0.08, 0.09, 0.10, 0.18))),
+            background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.0))),
             border: Border {
                 radius: 12.0.into(),
                 width: 1.5,
@@ -593,18 +620,18 @@ impl MinimalButtonStyle {
     fn base_appearance(&self) -> button::Appearance {
         let (bg, border, text_color) = match self.kind {
             ButtonKind::Primary => (
-                Color::from_rgba(0.40, 0.58, 0.94, 0.30),
-                Color::from_rgba(0.78, 0.86, 1.00, 0.42),
+                Color::from_rgba(0.32, 0.52, 0.95, 1.0),
+                Color::from_rgba(0.76, 0.86, 1.00, 1.0),
                 Color::from_rgb8(240, 246, 255),
             ),
             ButtonKind::Neutral => (
-                Color::from_rgba(1.0, 1.0, 1.0, 0.16),
-                Color::from_rgba(0.92, 0.94, 0.98, 0.35),
-                Color::from_rgb8(236, 240, 247),
+                Color::from_rgba(1.0, 1.0, 1.0, 0.72),
+                Color::from_rgba(0.90, 0.93, 0.98, 0.6),
+                Color::from_rgb8(230, 50, 100),
             ),
             ButtonKind::Danger => (
-                Color::from_rgba(0.95, 0.40, 0.46, 0.28),
-                Color::from_rgba(1.00, 0.74, 0.78, 0.42),
+                Color::from_rgba(0.93, 0.34, 0.42, 1.0),
+                Color::from_rgba(0.99, 0.72, 0.77, 1.0),
                 Color::from_rgb8(255, 243, 245),
             ),
         };
@@ -614,15 +641,11 @@ impl MinimalButtonStyle {
             text_color,
             border: Border {
                 radius: 11.0.into(),
-                width: 1.0,
+                width: 1.2,
                 color: border,
             },
-            shadow: iced::Shadow {
-                color: Color::from_rgba(0.0, 0.0, 0.0, 0.20),
-                offset: iced::Vector::new(0.0, 1.0),
-                blur_radius: 6.0,
-            },
-            shadow_offset: iced::Vector::new(0.0, 1.0),
+            shadow: iced::Shadow::default(),
+            shadow_offset: iced::Vector::default(),
         }
     }
 }
@@ -638,18 +661,23 @@ impl button::StyleSheet for MinimalButtonStyle {
         let mut active = self.active(style);
         if let Some(Background::Color(color)) = active.background {
             active.background = Some(Background::Color(Color {
-                a: (color.a + 0.10).min(1.0),
+                a: (color.a + 0.14).min(1.0),
                 ..color
             }));
         }
-        active.border.width = 1.2;
-        active.shadow_offset = iced::Vector::new(0.0, 2.0);
+        active.border.width = 1.5;
         active
     }
 
     fn pressed(&self, style: &Self::Style) -> button::Appearance {
         let mut active = self.active(style);
-        active.shadow_offset = iced::Vector::default();
+        active.border.width = 1.0;
+        if let Some(Background::Color(color)) = active.background {
+            active.background = Some(Background::Color(Color {
+                a: (color.a * 0.90).max(0.20),
+                ..color
+            }));
+        }
         active
     }
 
@@ -665,7 +693,6 @@ impl button::StyleSheet for MinimalButtonStyle {
             a: active.text_color.a * 0.65,
             ..active.text_color
         };
-        active.shadow_offset = iced::Vector::default();
         active
     }
 }
@@ -678,11 +705,11 @@ impl iced::widget::text_input::StyleSheet for GlassInputStyle {
 
     fn active(&self, _style: &Self::Style) -> iced::widget::text_input::Appearance {
         iced::widget::text_input::Appearance {
-            background: Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.16)),
+            background: Background::Color(Color::from_rgba(0.08, 0.10, 0.14, 0.76)),
             border: Border {
                 radius: 11.0.into(),
-                width: 1.0,
-                color: Color::from_rgba(0.90, 0.94, 1.0, 0.36),
+                width: 1.2,
+                color: Color::from_rgba(0.70, 0.80, 0.96, 0.84),
             },
             icon_color: Color::from_rgb8(220, 228, 240),
         }
@@ -690,22 +717,22 @@ impl iced::widget::text_input::StyleSheet for GlassInputStyle {
 
     fn focused(&self, _style: &Self::Style) -> iced::widget::text_input::Appearance {
         iced::widget::text_input::Appearance {
-            background: Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.20)),
+            background: Background::Color(Color::from_rgba(0.06, 0.08, 0.12, 0.86)),
             border: Border {
                 radius: 11.0.into(),
-                width: 1.2,
-                color: Color::from_rgba(0.72, 0.86, 1.0, 0.60),
+                width: 1.6,
+                color: Color::from_rgba(0.64, 0.82, 1.0, 0.98),
             },
             icon_color: Color::from_rgb8(240, 246, 255),
         }
     }
 
     fn placeholder_color(&self, _style: &Self::Style) -> Color {
-        Color::from_rgba(0.90, 0.93, 0.98, 0.72)
+        Color::from_rgba(0.92, 0.95, 1.0, 0.92)
     }
 
     fn value_color(&self, _style: &Self::Style) -> Color {
-        Color::from_rgb8(245, 247, 252)
+        Color::from_rgb8(247, 250, 255)
     }
 
     fn disabled_color(&self, _style: &Self::Style) -> Color {
@@ -733,12 +760,44 @@ impl iced::widget::container::StyleSheet for StatusBarStyle {
     fn appearance(&self, _style: &Self::Style) -> iced::widget::container::Appearance {
         iced::widget::container::Appearance {
             text_color: None,
-            background: Some(Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.10))),
+            background: Some(Background::Color(Color::from_rgba(0.07, 0.09, 0.13, 0.72))),
             border: Border {
                 radius: 10.0.into(),
-                width: 1.0,
-                color: Color::from_rgba(0.88, 0.92, 1.0, 0.30),
+                width: 0.8,
+                color: Color::from_rgba(0.72, 0.82, 0.96, 0.54),
             },
+            shadow: iced::Shadow::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CaptureHoleStyle {
+    show_border: bool,
+}
+
+impl iced::widget::container::StyleSheet for CaptureHoleStyle {
+    type Style = Theme;
+
+    fn appearance(&self, _style: &Self::Style) -> iced::widget::container::Appearance {
+        let border = if self.show_border {
+            Border {
+                radius: 4.0.into(),
+                width: 2.0,
+                color: Color::from_rgba(0.99, 0.88, 0.26, 0.95),
+            }
+        } else {
+            Border {
+                radius: 4.0.into(),
+                width: 0.0,
+                color: Color::TRANSPARENT,
+            }
+        };
+
+        iced::widget::container::Appearance {
+            text_color: None,
+            background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.0))),
+            border,
             shadow: iced::Shadow::default(),
         }
     }

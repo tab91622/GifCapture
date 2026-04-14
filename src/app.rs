@@ -2,11 +2,10 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use iced::event;
-use iced::executor;
 use iced::theme;
 use iced::time;
 use iced::widget::{button, column, container, row, text, text_input};
-use iced::{Application, Background, Border, Color, Command, Element, Length, Subscription, Theme};
+use iced::{Background, Border, Color, Element, Length, Subscription, Task, Theme};
 use rfd::FileDialog;
 
 use crate::capture;
@@ -63,13 +62,35 @@ pub enum Message {
     ExportFinished(Result<encoder::EncodeSuccess, encoder::EncodeFailure>),
 }
 
-impl Application for GifCaptureApp {
-    type Executor = executor::Default;
-    type Message = Message;
-    type Theme = Theme;
-    type Flags = ();
+pub fn update_app(state: &mut GifCaptureApp, message: Message) -> Task<Message> {
+    state.update(message)
+}
 
-    fn new(_flags: Self::Flags) -> (Self, Command<Message>) {
+pub fn view_app(state: &GifCaptureApp) -> Element<'_, Message> {
+    state.view()
+}
+
+pub fn app_subscription(state: &GifCaptureApp) -> Subscription<Message> {
+    state.subscription()
+}
+
+pub fn app_theme(_state: &GifCaptureApp) -> Theme {
+    Theme::Dark
+}
+
+pub fn app_style(_state: &GifCaptureApp, _theme: &Theme) -> theme::Style {
+    theme::Style {
+        background_color: Color::TRANSPARENT,
+        text_color: Color::from_rgb8(245, 245, 248),
+    }
+}
+
+pub fn app_title(_state: &GifCaptureApp) -> String {
+    "GifCapture".to_string()
+}
+
+impl GifCaptureApp {
+    pub fn init() -> (Self, Task<Message>) {
         (
             Self {
                 region_x: "100".to_string(),
@@ -85,19 +106,11 @@ impl Application for GifCaptureApp {
                 window_height: 500,
                 ..Self::default()
             },
-            Command::none(),
+            Task::none(),
         )
     }
 
-    fn title(&self) -> String {
-        "GifCapture".to_string()
-    }
-
-    fn style(&self) -> theme::Application {
-        theme::Application::custom(TransparentWindowStyle)
-    }
-
-    fn update(&mut self, message: Message) -> Command<Message> {
+    fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::RegionWidthChanged(value) => self.region_width = value,
             Message::RegionHeightChanged(value) => self.region_height = value,
@@ -159,7 +172,7 @@ impl Application for GifCaptureApp {
                 if self.is_recording {
                     if self.capture_in_flight {
                         self.skipped_ticks = self.skipped_ticks.saturating_add(1);
-                        return Command::none();
+                        return Task::none();
                     }
                     if let (Some(started), Ok(max_seconds)) =
                         (self.started_at.as_ref(), self.parse_max_seconds())
@@ -172,13 +185,13 @@ impl Application for GifCaptureApp {
                                 max_seconds,
                                 self.frames.len()
                             );
-                            return Command::none();
+                            return Task::none();
                         }
                     }
                     match self.parse_region() {
                         Ok(region) => {
                             self.capture_in_flight = true;
-                            return Command::perform(
+                            return Task::perform(
                                 capture::capture_region(region),
                                 Message::FrameCaptured,
                             );
@@ -210,29 +223,29 @@ impl Application for GifCaptureApp {
             Message::ExportGif => {
                 if self.frames.is_empty() {
                     self.status = "No frames to export. Record first.".to_string();
-                    return Command::none();
+                    return Task::none();
                 }
                 if self.is_recording {
                     self.status = "Stop recording before export".to_string();
-                    return Command::none();
+                    return Task::none();
                 }
                 let fps = match self.parse_fps() {
                     Ok(fps) => fps,
                     Err(err) => {
                         self.status = err;
-                        return Command::none();
+                        return Task::none();
                     }
                 };
                 let Some(output_path) = Self::pick_output_path() else {
                     self.status = "Export cancelled".to_string();
-                    return Command::none();
+                    return Task::none();
                 };
 
                 self.is_exporting = true;
                 let frame_count = self.frames.len();
                 let frames = std::mem::take(&mut self.frames);
                 self.status = format!("Exporting GIF... {} frames", frame_count);
-                return Command::perform(
+                return Task::perform(
                     encoder::encode_gif(output_path, frames, fps),
                     Message::ExportFinished,
                 );
@@ -251,7 +264,7 @@ impl Application for GifCaptureApp {
                 }
             }
         }
-        Command::none()
+        Task::none()
     }
 
     fn view(&self) -> Element<'_, Message> {
@@ -260,25 +273,25 @@ impl Application for GifCaptureApp {
                 .on_input(Message::RegionWidthChanged)
                 .padding([5, 8])
                 .size(13)
-                .style(theme::TextInput::Custom(Box::new(GlassInputStyle)))
+                .style(|_, status| glass_input_style(status))
                 .width(Length::Fixed(58.0)),
             text_input("h", &self.region_height)
                 .on_input(Message::RegionHeightChanged)
                 .padding([5, 8])
                 .size(13)
-                .style(theme::TextInput::Custom(Box::new(GlassInputStyle)))
+                .style(|_, status| glass_input_style(status))
                 .width(Length::Fixed(58.0)),
             text_input("fps", &self.fps)
                 .on_input(Message::FpsChanged)
                 .padding([5, 8])
                 .size(13)
-                .style(theme::TextInput::Custom(Box::new(GlassInputStyle)))
+                .style(|_, status| glass_input_style(status))
                 .width(Length::Fixed(44.0)),
             text_input("seconds", &self.max_seconds)
                 .on_input(Message::MaxSecondsChanged)
                 .padding([5, 8])
                 .size(13)
-                .style(theme::TextInput::Custom(Box::new(GlassInputStyle)))
+                .style(|_, status| glass_input_style(status))
                 .width(Length::Fixed(48.0)),
         ]
         .spacing(6);
@@ -286,7 +299,7 @@ impl Application for GifCaptureApp {
         let start_button = button("Record")
             .padding([6, 14])
             .width(Length::Fixed(76.0))
-            .style(theme::Button::custom(MinimalButtonStyle::primary()))
+            .style(|_, status| minimal_button_style(ButtonKind::Primary, status))
             .on_press_maybe(
                 (!self.is_recording && !self.is_exporting).then_some(Message::StartRecording),
             );
@@ -294,7 +307,7 @@ impl Application for GifCaptureApp {
         let stop_button = button("Stop")
             .padding([6, 14])
             .width(Length::Fixed(64.0))
-            .style(theme::Button::custom(MinimalButtonStyle::danger()))
+            .style(|_, status| minimal_button_style(ButtonKind::Danger, status))
             .on_press_maybe(
                 (self.is_recording && !self.is_exporting).then_some(Message::StopRecording),
             );
@@ -302,7 +315,7 @@ impl Application for GifCaptureApp {
         let export_button = button("Export")
             .padding([6, 14])
             .width(Length::Fixed(72.0))
-            .style(theme::Button::custom(MinimalButtonStyle::primary()))
+            .style(|_, status| minimal_button_style(ButtonKind::Primary, status))
             .on_press_maybe(
                 (!self.is_recording && !self.is_exporting).then_some(Message::ExportGif),
             );
@@ -310,7 +323,7 @@ impl Application for GifCaptureApp {
         let clear_button = button("Clear")
             .padding([6, 14])
             .width(Length::Fixed(64.0))
-            .style(theme::Button::custom(MinimalButtonStyle::neutral()))
+            .style(|_, status| minimal_button_style(ButtonKind::Neutral, status))
             .on_press_maybe(
                 (!self.is_recording && !self.is_exporting).then_some(Message::ClearFrames),
             );
@@ -326,7 +339,7 @@ impl Application for GifCaptureApp {
             .spacing(6),
         )
         .height(Length::Fixed(Self::CONTROLS_STRIP_HEIGHT as f32))
-        .center_y();
+        .center_y(Length::Fill);
 
         let panel_content = column![controls_strip]
             .spacing(0)
@@ -336,14 +349,15 @@ impl Application for GifCaptureApp {
         let top_panel = container(panel_content)
             .width(Length::Fill)
             .height(Length::Fixed(Self::TOP_PANEL_HEIGHT as f32))
-            .style(theme::Container::Custom(Box::new(FloatingPanelStyle)));
+            .style(|_| floating_panel_style());
 
         let capture_hole = container(text(""))
             .width(Length::Fill)
             .height(Length::Fill)
-            .style(theme::Container::Custom(Box::new(CaptureHoleStyle {
-                show_border: !self.is_recording,
-            })));
+            .style({
+                let show_border = !self.is_recording;
+                move |_| capture_hole_style(show_border)
+            });
 
         let layout = column![
             top_panel,
@@ -358,36 +372,12 @@ impl Application for GifCaptureApp {
             .width(Length::Fill)
             .height(Length::Fill)
             .padding(Self::WINDOW_INNER_PADDING as u16)
-            .style(theme::Container::Custom(Box::new(RecordingFrameStyle)))
+            .style(|_| recording_frame_style())
             .into()
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        let window_subscription = event::listen_with(|event, _status| match event {
-            iced::Event::Window(
-                id,
-                iced::window::Event::Opened {
-                    position: Some(position),
-                    size,
-                },
-            ) if id == iced::window::Id::MAIN => Some(Message::WindowOpened {
-                x: position.x.round() as i32,
-                y: position.y.round() as i32,
-                width: size.width.round().max(1.0) as u32,
-                height: size.height.round().max(1.0) as u32,
-            }),
-            iced::Event::Window(id, iced::window::Event::Moved { x, y })
-                if id == iced::window::Id::MAIN =>
-            {
-                Some(Message::WindowMoved { x, y })
-            }
-            iced::Event::Window(id, iced::window::Event::Resized { width, height })
-                if id == iced::window::Id::MAIN =>
-            {
-                Some(Message::WindowResized { width, height })
-            }
-            _ => None,
-        });
+        let window_subscription = event::listen_with(map_window_events);
 
         if self.is_recording {
             let interval_ms = match self.parse_fps() {
@@ -401,6 +391,33 @@ impl Application for GifCaptureApp {
         } else {
             window_subscription
         }
+    }
+}
+
+fn map_window_events(
+    event: iced::Event,
+    _status: iced::event::Status,
+    _window: iced::window::Id,
+) -> Option<Message> {
+    match event {
+        iced::Event::Window(iced::window::Event::Opened {
+            position: Some(position),
+            size,
+        }) => Some(Message::WindowOpened {
+            x: position.x.round() as i32,
+            y: position.y.round() as i32,
+            width: size.width.round().max(1.0) as u32,
+            height: size.height.round().max(1.0) as u32,
+        }),
+        iced::Event::Window(iced::window::Event::Moved(position)) => Some(Message::WindowMoved {
+            x: position.x.round() as i32,
+            y: position.y.round() as i32,
+        }),
+        iced::Event::Window(iced::window::Event::Resized(size)) => Some(Message::WindowResized {
+            width: size.width.round().max(1.0) as u32,
+            height: size.height.round().max(1.0) as u32,
+        }),
+        _ => None,
     }
 }
 
@@ -510,243 +527,133 @@ impl GifCaptureApp {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct TransparentWindowStyle;
-
-impl iced::application::StyleSheet for TransparentWindowStyle {
-    type Style = Theme;
-
-    fn appearance(&self, _style: &Self::Style) -> iced::application::Appearance {
-        iced::application::Appearance {
-            background_color: Color::from_rgba(0.0, 0.0, 0.0, 0.0),
-            text_color: Color::from_rgb8(245, 245, 248),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct FloatingPanelStyle;
-
-impl iced::widget::container::StyleSheet for FloatingPanelStyle {
-    type Style = Theme;
-
-    fn appearance(&self, _style: &Self::Style) -> iced::widget::container::Appearance {
-        iced::widget::container::Appearance {
-            text_color: None,
-            background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.0))),
-            border: Border {
-                radius: 0.0.into(),
-                width: 0.0,
-                color: Color::TRANSPARENT,
-            },
-            shadow: iced::Shadow::default(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct RecordingFrameStyle;
-
-impl iced::widget::container::StyleSheet for RecordingFrameStyle {
-    type Style = Theme;
-
-    fn appearance(&self, _style: &Self::Style) -> iced::widget::container::Appearance {
-        iced::widget::container::Appearance {
-            text_color: None,
-            background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.0))),
-            border: Border {
-                radius: 12.0.into(),
-                width: 1.5,
-                color: Color::from_rgba(1.0, 1.0, 1.0, 0.34),
-            },
-            shadow: iced::Shadow::default(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
 enum ButtonKind {
     Primary,
     Neutral,
     Danger,
 }
 
-#[derive(Debug, Clone, Copy)]
-struct MinimalButtonStyle {
-    kind: ButtonKind,
-}
-
-impl MinimalButtonStyle {
-    fn primary() -> Self {
-        Self {
-            kind: ButtonKind::Primary,
-        }
-    }
-
-    fn neutral() -> Self {
-        Self {
-            kind: ButtonKind::Neutral,
-        }
-    }
-
-    fn danger() -> Self {
-        Self {
-            kind: ButtonKind::Danger,
-        }
-    }
-
-    fn base_appearance(&self) -> button::Appearance {
-        let (bg, border, text_color) = match self.kind {
-            ButtonKind::Primary => (
-                Color::from_rgba(0.32, 0.52, 0.95, 1.0),
-                Color::from_rgba(0.76, 0.86, 1.00, 1.0),
-                Color::from_rgb8(240, 246, 255),
-            ),
-            ButtonKind::Neutral => (
-                Color::from_rgba(1.0, 1.0, 1.0, 0.72),
-                Color::from_rgba(0.90, 0.93, 0.98, 0.6),
-                Color::from_rgb8(230, 50, 100),
-            ),
-            ButtonKind::Danger => (
-                Color::from_rgba(0.93, 0.34, 0.42, 1.0),
-                Color::from_rgba(0.99, 0.72, 0.77, 1.0),
-                Color::from_rgb8(255, 243, 245),
-            ),
-        };
-
-        button::Appearance {
-            background: Some(Background::Color(bg)),
-            text_color,
-            border: Border {
-                radius: 11.0.into(),
-                width: 1.0,
-                color: border,
-            },
-            shadow: iced::Shadow::default(),
-            shadow_offset: iced::Vector::default(),
-        }
+fn floating_panel_style() -> container::Style {
+    container::Style {
+        text_color: None,
+        background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.0))),
+        border: Border {
+            radius: 0.0.into(),
+            width: 0.0,
+            color: Color::TRANSPARENT,
+        },
+        shadow: iced::Shadow::default(),
+        snap: false,
     }
 }
 
-impl button::StyleSheet for MinimalButtonStyle {
-    type Style = Theme;
-
-    fn active(&self, _style: &Self::Style) -> button::Appearance {
-        self.base_appearance()
-    }
-
-    fn hovered(&self, style: &Self::Style) -> button::Appearance {
-        let mut active = self.active(style);
-        if let Some(Background::Color(color)) = active.background {
-            active.background = Some(Background::Color(Color {
-                a: (color.a + 0.06).min(1.0),
-                ..color
-            }));
-        }
-        active
-    }
-
-    fn pressed(&self, style: &Self::Style) -> button::Appearance {
-        self.active(style)
-    }
-
-    fn disabled(&self, style: &Self::Style) -> button::Appearance {
-        let mut active = self.active(style);
-        if let Some(Background::Color(color)) = active.background {
-            active.background = Some(Background::Color(Color {
-                a: color.a * 0.45,
-                ..color
-            }));
-        }
-        active.text_color = Color {
-            a: active.text_color.a * 0.65,
-            ..active.text_color
-        };
-        active
+fn recording_frame_style() -> container::Style {
+    container::Style {
+        text_color: None,
+        background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.0))),
+        border: Border {
+            radius: 12.0.into(),
+            width: 1.5,
+            color: Color::from_rgba(1.0, 1.0, 1.0, 0.34),
+        },
+        shadow: iced::Shadow::default(),
+        snap: false,
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-struct GlassInputStyle;
-
-impl iced::widget::text_input::StyleSheet for GlassInputStyle {
-    type Style = Theme;
-
-    fn active(&self, _style: &Self::Style) -> iced::widget::text_input::Appearance {
-        iced::widget::text_input::Appearance {
-            background: Background::Color(Color::from_rgba(0.93, 0.96, 1.0, 0.78)),
-            border: Border {
-                radius: 11.0.into(),
-                width: 1.2,
-                color: Color::from_rgba(0.56, 0.69, 0.90, 0.82),
-            },
-            icon_color: Color::from_rgb8(70, 100, 145),
+fn capture_hole_style(show_border: bool) -> container::Style {
+    let border = if show_border {
+        Border {
+            radius: 4.0.into(),
+            width: 2.0,
+            color: Color::from_rgba(0.99, 0.88, 0.26, 0.95),
         }
-    }
-
-    fn focused(&self, _style: &Self::Style) -> iced::widget::text_input::Appearance {
-        iced::widget::text_input::Appearance {
-            background: Background::Color(Color::from_rgba(0.98, 0.99, 1.0, 0.92)),
-            border: Border {
-                radius: 11.0.into(),
-                width: 1.6,
-                color: Color::from_rgba(0.45, 0.64, 0.92, 0.98),
-            },
-            icon_color: Color::from_rgb8(44, 78, 130),
+    } else {
+        Border {
+            radius: 4.0.into(),
+            width: 0.0,
+            color: Color::TRANSPARENT,
         }
-    }
+    };
 
-    fn placeholder_color(&self, _style: &Self::Style) -> Color {
-        Color::from_rgba(0.28, 0.38, 0.56, 0.70)
-    }
-
-    fn value_color(&self, _style: &Self::Style) -> Color {
-        Color::from_rgb8(26, 40, 64)
-    }
-
-    fn disabled_color(&self, _style: &Self::Style) -> Color {
-        Color::from_rgba(0.88, 0.90, 0.95, 0.40)
-    }
-
-    fn selection_color(&self, _style: &Self::Style) -> Color {
-        Color::from_rgba(0.52, 0.72, 0.98, 0.42)
-    }
-
-    fn disabled(&self, style: &Self::Style) -> iced::widget::text_input::Appearance {
-        let mut base = self.active(style);
-        base.background = Background::Color(Color::from_rgba(0.92, 0.94, 0.98, 0.44));
-        base.border.color = Color::from_rgba(0.66, 0.74, 0.88, 0.35);
-        base
+    container::Style {
+        text_color: None,
+        background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.0))),
+        border,
+        shadow: iced::Shadow::default(),
+        snap: false,
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-struct CaptureHoleStyle {
-    show_border: bool,
+fn minimal_button_style(kind: ButtonKind, status: button::Status) -> button::Style {
+    let (mut bg, border, mut text_color) = match kind {
+        ButtonKind::Primary => (
+            Color::from_rgba(0.32, 0.52, 0.95, 1.0),
+            Color::from_rgba(0.76, 0.86, 1.00, 1.0),
+            Color::from_rgb8(240, 246, 255),
+        ),
+        ButtonKind::Neutral => (
+            Color::from_rgba(1.0, 1.0, 1.0, 0.72),
+            Color::from_rgba(0.90, 0.93, 0.98, 0.6),
+            Color::from_rgb8(230, 50, 100),
+        ),
+        ButtonKind::Danger => (
+            Color::from_rgba(0.93, 0.34, 0.42, 1.0),
+            Color::from_rgba(0.99, 0.72, 0.77, 1.0),
+            Color::from_rgb8(255, 243, 245),
+        ),
+    };
+
+    match status {
+        button::Status::Hovered => bg.a = (bg.a + 0.06).min(1.0),
+        button::Status::Disabled => {
+            bg.a *= 0.45;
+            text_color.a *= 0.65;
+        }
+        button::Status::Active | button::Status::Pressed => {}
+    }
+
+    button::Style {
+        background: Some(Background::Color(bg)),
+        text_color,
+        border: Border {
+            radius: 11.0.into(),
+            width: 1.0,
+            color: border,
+        },
+        shadow: iced::Shadow::default(),
+        snap: false,
+    }
 }
 
-impl iced::widget::container::StyleSheet for CaptureHoleStyle {
-    type Style = Theme;
+fn glass_input_style(status: text_input::Status) -> text_input::Style {
+    let mut style = text_input::Style {
+        background: Background::Color(Color::from_rgba(0.93, 0.96, 1.0, 0.78)),
+        border: Border {
+            radius: 11.0.into(),
+            width: 1.2,
+            color: Color::from_rgba(0.56, 0.69, 0.90, 0.82),
+        },
+        icon: Color::from_rgb8(70, 100, 145),
+        placeholder: Color::from_rgba(0.28, 0.38, 0.56, 0.70),
+        value: Color::from_rgb8(26, 40, 64),
+        selection: Color::from_rgba(0.52, 0.72, 0.98, 0.42),
+    };
 
-    fn appearance(&self, _style: &Self::Style) -> iced::widget::container::Appearance {
-        let border = if self.show_border {
-            Border {
-                radius: 4.0.into(),
-                width: 2.0,
-                color: Color::from_rgba(0.99, 0.88, 0.26, 0.95),
-            }
-        } else {
-            Border {
-                radius: 4.0.into(),
-                width: 0.0,
-                color: Color::TRANSPARENT,
-            }
-        };
-
-        iced::widget::container::Appearance {
-            text_color: None,
-            background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.0))),
-            border,
-            shadow: iced::Shadow::default(),
+    match status {
+        text_input::Status::Focused { .. } => {
+            style.background = Background::Color(Color::from_rgba(0.98, 0.99, 1.0, 0.92));
+            style.border.width = 1.6;
+            style.border.color = Color::from_rgba(0.45, 0.64, 0.92, 0.98);
+            style.icon = Color::from_rgb8(44, 78, 130);
         }
+        text_input::Status::Disabled => {
+            style.background = Background::Color(Color::from_rgba(0.92, 0.94, 0.98, 0.44));
+            style.border.color = Color::from_rgba(0.66, 0.74, 0.88, 0.35);
+            style.value = Color::from_rgba(0.88, 0.90, 0.95, 0.40);
+        }
+        text_input::Status::Active | text_input::Status::Hovered => {}
     }
+
+    style
 }

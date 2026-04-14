@@ -62,8 +62,25 @@ cargo bundle --release
 # 2) 使用 create-dmg 或 hdiutil 把 .app 封装成 .dmg
 ```
 
-## 已知限制
+## 热更新
 
-- 当前是“轮询截图抓帧”方案，性能不如原生视频流采集
-- 仅支持 macOS
-- 没有内置区域选择蒙层（需要手动输入坐标）
+1. 安装 cargo-watch
+   首先，你需要安装 cargo-watch，这是一个用于监听文件变化的 Rust 官方工具。在终端运行：
+
+```bash
+cargo install cargo-watch
+```
+
+2. 修改 Cargo.toml
+
+```toml
+[dependencies]
+# 启用 "hot" 特性以支持热重载
+iced = { version = "0.14", features = ["hot"] }
+```
+
+3. 热更新命令启动
+
+```bash
+cargo watch -x run
+```
